@@ -28,12 +28,13 @@ class _UsersScreenState extends State<UsersScreen> {
   }
 
   Future<void> _showEditDialog(User user) async {
+    final parentCtx = context; // capture parent context to use after awaits
     final nameController = TextEditingController(text: user.name);
     final emailController = TextEditingController(text: user.email ?? '');
     bool saving = false;
 
     await showDialog<void>(
-      context: context,
+      context: parentCtx,
       builder: (context) {
         return StatefulBuilder(builder: (context, setStateDialog) {
           return AlertDialog(
@@ -61,15 +62,18 @@ class _UsersScreenState extends State<UsersScreen> {
                     ? null
                     : () async {
                         setStateDialog(() => saving = true);
+                        final navigator = Navigator.of(parentCtx);
+                        final messenger = ScaffoldMessenger.of(parentCtx);
                         try {
                           if (user.id == null) throw Exception('User id is null');
                           await api.updateUser(user.id!, name: nameController.text.trim(), email: emailController.text.trim());
-                          Navigator.of(context).pop();
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Usuario actualizado')));
-                          await _refresh();
+                          // use captured navigator/messenger instances (safe across async)
+                          navigator.pop();
+                          if (mounted) messenger.showSnackBar(const SnackBar(content: Text('Usuario actualizado')));
+                          if (mounted) await _refresh();
                         } catch (e) {
                           setStateDialog(() => saving = false);
-                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
+                          if (mounted) messenger.showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
                         }
                       },
                 child: saving ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Guardar'),

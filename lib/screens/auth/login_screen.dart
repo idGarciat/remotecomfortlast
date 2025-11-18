@@ -26,7 +26,10 @@ class LoginScreen extends StatelessWidget {
                       const Text('Smart Home', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 18)),
                       const Spacer(),
                       IconButton(
-                        onPressed: () {},
+                        onPressed: () {
+                          // Inicio de sesión alternativo: ir directo a la pantalla principal
+                          Navigator.of(context).pushReplacementNamed('/dashboard', arguments: 0);
+                        },
                         icon: const Icon(Icons.help_outline),
                         color: Colors.grey,
                       )
@@ -41,9 +44,9 @@ class LoginScreen extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Text('Welcome back', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
+                          const Text('Bienvenido', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white)),
                           const SizedBox(height: 8),
-                          Text('Prueba de update1', style: TextStyle(color: Colors.grey[400])),
+                          Text('Control del hogar', style: TextStyle(color: Colors.grey[400])),
                           const SizedBox(height: 24),
 
                           // Face recognition button centered

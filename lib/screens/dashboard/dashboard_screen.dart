@@ -25,10 +25,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   double _temperatura = 0.0;
   double _umbral = 30.0;
   bool _puertaAbierta = false;
-  final List<bool> _habitaciones = [false, false, false, false, false, false];
-  final List<String> _nombresHabitaciones = [
-    'Sala', 'Cocina', 'Comedor', 'Baño', 'Dormitorio 1', 'Dormitorio 2'
-  ];
+  // Usamos 4 habitaciones: Sala, Cocina, Comedor, Baño
+  final List<bool> _habitaciones = [false, false, false, false];
+  final List<String> _nombresHabitaciones = ['Sala', 'Habitacion 1', 'Habitacion 2', 'Baño'];
 
   // Eventos recientes (más nuevo primero)
   final List<_Event> _events = [];
@@ -52,7 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_puertaLoading) return;
     setState(() => _puertaLoading = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enviando orden de apertura...'), duration: Duration(milliseconds: 800)));
+    // Capture messenger before awaiting network calls to avoid using context after async gaps
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('Enviando orden de apertura...'), duration: Duration(milliseconds: 800)));
 
     try {
       final url = Uri.parse('http://$esp32Ip/toggle_puerta');
@@ -62,20 +63,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         _events.insert(0, _Event('Puerta abierta manualmente', DateTime.now()));
         if (_events.length > 100) _events.removeLast();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al abrir puerta (${resp.statusCode})')));
+        if (mounted) messenger.showSnackBar(SnackBar(content: Text('Error al abrir puerta (${resp.statusCode})')));
         _events.insert(0, _Event('Error al abrir puerta', DateTime.now()));
         if (_events.length > 100) _events.removeLast();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error al abrir puerta: $e')));
+      if (mounted) messenger.showSnackBar(SnackBar(content: Text('Error al abrir puerta: $e')));
       _events.insert(0, _Event('Error al abrir puerta', DateTime.now()));
       if (_events.length > 100) _events.removeLast();
     } finally {
       if (mounted) setState(() => _puertaLoading = false);
     }
   }
-
-  // (removed helper _deviceRow — not used anymore)
 
   @override
   void dispose() {
@@ -84,6 +83,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _fetchStatus({bool background = true}) async {
+    // Capture messenger before any async gaps to avoid using `context` after awaits
+    final messenger = ScaffoldMessenger.of(context);
     if (!background && mounted) setState(() => _isLoading = true);
 
     try {
@@ -135,7 +136,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       }
     } catch (e) {
       if (!background && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error de conexión')));
+        messenger.showSnackBar(const SnackBar(content: Text('Error de conexión')));
         setState(() => _isLoading = false);
       }
     }
@@ -214,10 +215,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     const SizedBox(height: 12),
                     // --- Tarjeta de temperatura estilo `pruebamain.dart` pero con tonos azules ---
                     Builder(builder: (context) {
+                      // Tres estados: alarma, precaución y normal
                       final bool alarma = _temperatura >= _umbral;
-                      final tempCardColor = alarma
-                          ? Colors.redAccent.withAlpha((0.18 * 255).round())
-                          : primary.withAlpha((0.06 * 255).round());
+                      final bool precaucion = !alarma && (_temperatura >= (_umbral - 2.0));
+
+                      Color tempTextColor;
+                      Color tempCardColor;
+                      Color borderColor = Colors.transparent;
+                      String tempStatusText;
+
+                      if (alarma) {
+                        tempStatusText = '¡ALARMA ACTIVA!';
+                        tempTextColor = Colors.redAccent;
+                        tempCardColor = Colors.redAccent.withAlpha((0.18 * 255).round());
+                        borderColor = Colors.red;
+                      } else if (precaucion) {
+                        tempStatusText = 'Precaución';
+                        tempTextColor = Colors.orangeAccent;
+                        tempCardColor = Colors.orange.withAlpha((0.14 * 255).round());
+                      } else {
+                        tempStatusText = 'Temperatura Normal';
+                        tempTextColor = Colors.greenAccent;
+                        tempCardColor = primary.withAlpha((0.06 * 255).round());
+                      }
 
                       return Container(
                         width: double.infinity,
@@ -226,7 +246,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           color: tempCardColor,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: alarma ? Colors.red : Colors.transparent,
+                            color: borderColor,
                             width: alarma ? 2 : 0,
                           ),
                         ),
@@ -241,10 +261,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   children: [
                                     Text('${_temperatura.toStringAsFixed(1)}°C',
                                         style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
-                                    Text(
-                                      alarma ? '¡ALARMA ACTIVA!' : 'Temperatura Normal',
-                                      style: TextStyle(color: alarma ? Colors.redAccent : Colors.greenAccent),
-                                    ),
+                                    Text(tempStatusText, style: TextStyle(color: tempTextColor)),
                                   ],
                                 )
                               ],
